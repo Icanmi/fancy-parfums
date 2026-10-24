@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { PRODUCTS } from '../data/products'
 import { BRANDS } from '../data/brands'
 import { CATEGORIES } from '../data/categories'
-import { MOCK_ORDERS, MOCK_CUSTOMERS } from '../data/adminMockData'
 import { fetchProducts, createOrder as persistOrder } from '../services/supabaseService'
 import { getAdminCustomers } from '../services/adminCustomerService'
 import {
@@ -14,6 +13,8 @@ import {
   createAdminCategory,
   updateAdminCategory,
   deleteAdminCategory,
+  getAdminOrders,
+  patchOrderStatus,
 } from '../services/adminProductService'
 
 const AdminDataContext = createContext(null)
@@ -24,8 +25,9 @@ export function AdminDataProvider({ children }) {
   )
   const [brands, setBrands] = useState(BRANDS)
   const [categories, setCategories] = useState(CATEGORIES)
-  const [orders, setOrders] = useState(MOCK_ORDERS)
-  const [customers, setCustomers] = useState(MOCK_CUSTOMERS)
+  const [orders, setOrders] = useState([])
+  const [ordersLoading, setOrdersLoading] = useState(true)
+  const [customers, setCustomers] = useState([])
 
   const reloadCustomers = useCallback(async () => {
     try {
@@ -64,11 +66,12 @@ export function AdminDataProvider({ children }) {
     let mounted = true
     async function initSupabaseData() {
       try {
-        const [dbProducts, dbCats, dbBrands, dbCusts] = await Promise.all([
+        const [dbProducts, dbCats, dbBrands, dbCusts, dbOrders] = await Promise.all([
           fetchProducts(),
           getAdminCategories().catch(() => null),
           getAdminBrands().catch(() => null),
           getAdminCustomers().catch(() => null),
+          getAdminOrders().catch(() => null),
         ])
         if (!mounted) return
         if (dbProducts && dbProducts.length > 0) {
@@ -83,8 +86,11 @@ export function AdminDataProvider({ children }) {
         if (dbCats && dbCats.length > 0) setCategories(dbCats)
         if (dbBrands && dbBrands.length > 0) setBrands(dbBrands)
         if (dbCusts && dbCusts.length > 0) setCustomers(dbCusts)
+        if (dbOrders !== null) setOrders(dbOrders)
       } catch (e) {
         console.warn('Initial Supabase catalog sync deferred:', e)
+      } finally {
+        if (mounted) setOrdersLoading(false)
       }
     }
     initSupabaseData()
@@ -211,12 +217,19 @@ export function AdminDataProvider({ children }) {
     )
   }, [])
 
-  const updateOrderStatus = useCallback((id, status) => {
+  const updateOrderStatus = useCallback(async (id, status) => {
+    // Optimistic UI update
     setOrders((prev) =>
       prev.map((o) =>
         o.id === id ? { ...o, status, updatedAt: new Date().toISOString() } : o
       )
     )
+    // Persist to Supabase via API
+    try {
+      await patchOrderStatus(id, status)
+    } catch (err) {
+      console.warn('Failed to persist order status update:', err)
+    }
   }, [])
 
   // ── Inventory ────────────────────────────────────────────
@@ -231,7 +244,7 @@ export function AdminDataProvider({ children }) {
   }, [])
 
   const value = {
-    products, brands, categories, orders, customers, reloadCustomers, reloadBrands, reloadCategories,
+    products, brands, categories, orders, ordersLoading, customers, reloadCustomers, reloadBrands, reloadCategories,
     addProduct, updateProduct, deleteProduct, toggleProductActive,
     addCategory, updateCategory, deleteCategory,
     addBrand, updateBrand, deleteBrand,

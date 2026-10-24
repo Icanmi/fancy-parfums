@@ -6,6 +6,9 @@ import adminProductsRouter from './routes/adminProducts.js'
 import adminBrandsRouter from './routes/adminBrands.js'
 import adminCategoriesRouter from './routes/adminCategories.js'
 import adminCustomersRouter from './routes/adminCustomers.js'
+import adminOrdersRouter from './routes/adminOrders.js'
+import orderRoutes from './routes/orderRoutes.js'
+import couponRoutes from './routes/couponRoutes.js'
 import userRoutes from './routes/userRoutes.js'
 import { errorHandler } from './middleware/errorHandler.js'
 
@@ -41,6 +44,9 @@ app.use('/api/admin/brands', adminBrandsRouter)
 app.use('/api/admin/categories', adminCategoriesRouter)
 app.use('/api/admin', adminProductsRouter)
 app.use('/api/admin', adminCustomersRouter)
+app.use('/api/admin', adminOrdersRouter)
+app.use('/api', orderRoutes)
+app.use('/api', couponRoutes)
 
 // Error handling
 app.use(errorHandler)

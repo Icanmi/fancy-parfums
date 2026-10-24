@@ -138,3 +138,50 @@ export async function deleteAdminBrand(id, token) {
   return res.data?.data
 }
 
+// ─── Orders (Admin) ──────────────────────────────────────────────
+export async function getAdminOrders({ search, status, sortBy, sortDir, token } = {}) {
+  const params = {}
+  if (search) params.search = search
+  if (status && status !== 'all') params.status = status
+  if (sortBy) params.sortBy = sortBy
+  if (sortDir) params.sortDir = sortDir
+
+  const res = await axios.get(`${API_BASE}/orders`, {
+    params,
+    headers: getAuthHeaders(token),
+  })
+  return res.data?.data || []
+}
+
+export async function getAdminOrderById(id, token) {
+  const res = await axios.get(`${API_BASE}/orders/${id}`, {
+    headers: getAuthHeaders(token),
+  })
+  return res.data?.data
+}
+
+export async function patchOrderStatus(id, status, token) {
+  const res = await axios.patch(
+    `${API_BASE}/orders/${id}/status`,
+    { status },
+    { headers: getAuthHeaders(token) }
+  )
+  return res.data?.data
+}
+
+// ─── Orders (Customer) ───────────────────────────────────────────
+export async function getCustomerOrders(clerkUserId, token) {
+  const headers = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  if (clerkUserId) headers['x-clerk-user-id'] = clerkUserId
+  headers['Content-Type'] = 'application/json'
+
+  const res = await axios.get('/api/orders', { headers })
+  return res.data?.data || []
+}
+
+// ─── Coupons ─────────────────────────────────────────────────────
+export async function validateCouponCode(code) {
+  const res = await axios.post('/api/coupons/validate', { code })
+  return res.data // { valid, discount_type, discount_value, ... }
+}
