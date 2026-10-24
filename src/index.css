@@ -1,0 +1,230 @@
+/* ─── Tokens ─────────────────────────────────────────────── */
+@import './design-system/tokens.css';
+
+/* ─── Tailwind ───────────────────────────────────────────── */
+@import 'tailwindcss';
+
+/* ─── Base Layer ─────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background-color: var(--color-cream);
+    color: var(--color-black);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100svh;
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+  }
+}
+
+/* ─── Component Classes ──────────────────────────────────── */
+@layer components {
+
+  /* Buttons */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 2rem;
+    background-color: var(--color-gold);
+    color: var(--color-black);
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 2px solid var(--color-gold);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background var(--transition-base), color var(--transition-base),
+                box-shadow var(--transition-base), transform var(--transition-base);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .btn-primary:hover {
+    background-color: #c09d2c;
+    border-color: #c09d2c;
+    box-shadow: var(--shadow-gold);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 2rem;
+    background-color: transparent;
+    color: var(--color-white);
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 2px solid var(--color-white);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background var(--transition-base), color var(--transition-base),
+                transform var(--transition-base);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .btn-secondary:hover {
+    background-color: var(--color-white);
+    color: var(--color-black);
+    transform: translateY(-1px);
+  }
+  .btn-secondary:active {
+    transform: translateY(0);
+  }
+
+  /* Badges */
+  .badge-new {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    background-color: var(--color-lemon);
+    color: var(--color-black);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-radius: 2px;
+  }
+
+  .badge-bestseller {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    background-color: var(--color-black);
+    color: var(--color-gold);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border: 1px solid var(--color-gold);
+    border-radius: 2px;
+  }
+
+  /* Typography helpers */
+  .section-heading {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 700;
+    color: var(--color-black);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  .text-accent {
+    color: var(--color-gold);
+    font-style: italic;
+    font-family: var(--font-display);
+  }
+
+  /* Section container */
+  .section-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding-inline: var(--container-px);
+    padding-block: var(--section-py);
+  }
+}
+
+/* ─── Clerk UserButton & Popover Dropdown Theme ────────────── */
+.cl-userButtonPopoverCard,
+[class*="cl-userButtonPopoverCard"] {
+  background-color: #121212 !important;
+  border: 1px solid rgba(212, 175, 55, 0.35) !important;
+  color: #FBF8EF !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 10px 10px -5px rgba(0, 0, 0, 0.5) !important;
+  border-radius: 4px !important;
+}
+
+.cl-userButtonPopoverMain,
+.cl-userButtonPopoverActions,
+[class*="cl-userButtonPopoverMain"],
+[class*="cl-userButtonPopoverActions"] {
+  background-color: #121212 !important;
+}
+
+.cl-userPreview,
+[class*="cl-userPreview"] {
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2) !important;
+  padding-bottom: 0.75rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.cl-userPreviewMainIdentifier,
+[class*="cl-userPreviewMainIdentifier"] {
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  font-size: 0.875rem !important;
+}
+
+.cl-userPreviewSecondaryIdentifier,
+[class*="cl-userPreviewSecondaryIdentifier"] {
+  color: #A89F91 !important;
+  font-size: 0.75rem !important;
+}
+
+.cl-userButtonPopoverActionButton,
+.cl-userButtonPopoverCustomItemButton,
+[class*="cl-userButtonPopoverActionButton"],
+[class*="cl-userButtonPopoverCustomItemButton"] {
+  color: #FBF8EF !important;
+  border-radius: 2px !important;
+  transition: all 0.2s ease !important;
+}
+
+.cl-userButtonPopoverActionButton:hover,
+.cl-userButtonPopoverCustomItemButton:hover,
+[class*="cl-userButtonPopoverActionButton"]:hover,
+[class*="cl-userButtonPopoverCustomItemButton"]:hover {
+  background-color: #1F1F1F !important;
+  color: #D4AF37 !important;
+}
+
+.cl-userButtonPopoverActionButtonText,
+[class*="cl-userButtonPopoverActionButtonText"] {
+  color: #FBF8EF !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+}
+
+.cl-userButtonPopoverActionButton:hover .cl-userButtonPopoverActionButtonText,
+.cl-userButtonPopoverCustomItemButton:hover .cl-userButtonPopoverActionButtonText,
+[class*="cl-userButtonPopoverActionButton"]:hover [class*="cl-userButtonPopoverActionButtonText"] {
+  color: #D4AF37 !important;
+}
+
+.cl-userButtonPopoverActionButtonIcon,
+.cl-userButtonPopoverActionButtonIconBox,
+[class*="cl-userButtonPopoverActionButtonIcon"],
+[class*="cl-userButtonPopoverActionButtonIconBox"] {
+  color: #D4AF37 !important;
+}
+
+.cl-userButtonPopoverFooter,
+[class*="cl-userButtonPopoverFooter"] {
+  display: none !important;
+}
+
