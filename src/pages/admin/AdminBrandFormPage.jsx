@@ -93,10 +93,10 @@ export default function AdminBrandFormPage() {
     try {
       if (isEdit) {
         await updateAdminBrand(id, payload)
-        toast.success('Brand updated in Supabase!')
+        toast.success('Brand updated successfully!')
       } else {
         await createAdminBrand(payload)
-        toast.success('Brand created in Supabase!')
+        toast.success('Brand created successfully!')
       }
       if (typeof reloadBrands === 'function') {
         await reloadBrands()
@@ -132,7 +132,7 @@ export default function AdminBrandFormPage() {
             {isEdit ? 'Edit Brand' : 'Add Brand'}
           </h1>
           <p className="text-xs text-[#6B6B88] mt-0.5">
-            {isEdit ? `Editing brand ID: ${id}` : 'Persisted directly to Supabase via Express API'}
+            {isEdit ? `Editing brand ID: ${id}` : 'Saved to Neon database via Express API'}
           </p>
         </div>
       </div>

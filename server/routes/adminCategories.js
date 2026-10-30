@@ -38,13 +38,13 @@ router.get('/:id', async (req, res, next) => {
   }
 })
 
-// POST /api/admin/categories — Create category in Supabase
+// POST /api/admin/categories — Create category
 router.post('/', async (req, res, next) => {
   try {
     const category = await createCategory(req.body)
     res.status(201).json({
       success: true,
-      message: 'Category successfully created in Supabase',
+      message: 'Category successfully created',
       data: category,
     })
   } catch (err) {
@@ -52,14 +52,14 @@ router.post('/', async (req, res, next) => {
   }
 })
 
-// PATCH /api/admin/categories/:id — Update category in Supabase
+// PATCH /api/admin/categories/:id — Update category
 router.patch('/:id', async (req, res, next) => {
   try {
     const { id } = req.params
     const updated = await updateCategory(id, req.body)
     res.json({
       success: true,
-      message: 'Category successfully updated in Supabase',
+      message: 'Category successfully updated',
       data: updated,
     })
   } catch (err) {
@@ -67,14 +67,14 @@ router.patch('/:id', async (req, res, next) => {
   }
 })
 
-// DELETE /api/admin/categories/:id — Delete category in Supabase
+// DELETE /api/admin/categories/:id — Delete category
 router.delete('/:id', async (req, res, next) => {
   try {
     const { id } = req.params
     await deleteCategory(id)
     res.json({
       success: true,
-      message: 'Category deleted successfully from Supabase',
+      message: 'Category deleted successfully',
       data: { id },
     })
   } catch (err) {

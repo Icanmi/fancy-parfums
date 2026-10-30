@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { PRODUCTS } from '../data/products'
 import { BRANDS } from '../data/brands'
 import { CATEGORIES } from '../data/categories'
-import { fetchProducts, createOrder as persistOrder } from '../services/supabaseService'
+import { fetchProducts, createOrder as persistOrder } from '../services/neonService'
 import { getAdminCustomers } from '../services/adminCustomerService'
 import {
   getAdminBrands,
@@ -64,7 +64,7 @@ export function AdminDataProvider({ children }) {
 
   useEffect(() => {
     let mounted = true
-    async function initSupabaseData() {
+    async function initCatalogData() {
       try {
         const [dbProducts, dbCats, dbBrands, dbCusts, dbOrders] = await Promise.all([
           fetchProducts(),
@@ -88,12 +88,12 @@ export function AdminDataProvider({ children }) {
         if (dbCusts && dbCusts.length > 0) setCustomers(dbCusts)
         if (dbOrders !== null) setOrders(dbOrders)
       } catch (e) {
-        console.warn('Initial Supabase catalog sync deferred:', e)
+        console.warn('Initial Neon catalog sync deferred:', e)
       } finally {
         if (mounted) setOrdersLoading(false)
       }
     }
-    initSupabaseData()
+    initCatalogData()
     return () => {
       mounted = false
     }
@@ -224,7 +224,7 @@ export function AdminDataProvider({ children }) {
         o.id === id ? { ...o, status, updatedAt: new Date().toISOString() } : o
       )
     )
-    // Persist to Supabase via API
+    // Persist to Neon via API
     try {
       await patchOrderStatus(id, status)
     } catch (err) {

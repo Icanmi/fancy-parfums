@@ -9,7 +9,7 @@ import {
   FiPhone,
   FiMapPin,
 } from 'react-icons/fi'
-import { subscribeNewsletter } from '../../services/supabaseService'
+import { subscribeNewsletter } from '../../services/neonService'
 
 export default function Footer() {
   const [email, setEmail] = useState('')

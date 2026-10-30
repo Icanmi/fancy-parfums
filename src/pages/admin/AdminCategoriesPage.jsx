@@ -42,7 +42,7 @@ export default function AdminCategoriesPage() {
       await deleteAdminCategory(id)
       setCategories((prev) => prev.filter((c) => c.id !== id))
       if (typeof reloadCategories === 'function') reloadCategories()
-      toast.success('Category deleted from Supabase.')
+      toast.success('Category deleted.')
       setDeleteTarget(null)
     } catch (err) {
       console.error('Delete category failed:', err)
@@ -58,7 +58,7 @@ export default function AdminCategoriesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]" style={{ fontFamily: 'var(--font-display)' }}>Categories</h1>
-          <p className="text-sm text-[#6B6B88] mt-0.5">{categories.length} categor{categories.length === 1 ? 'y' : 'ies'} in Supabase</p>
+          <p className="text-sm text-[#6B6B88] mt-0.5">{categories.length} categor{categories.length === 1 ? 'y' : 'ies'} in Neon</p>
         </div>
         <div className="flex items-center gap-2">
           <button

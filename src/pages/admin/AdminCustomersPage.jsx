@@ -61,7 +61,7 @@ export default function AdminCustomersPage() {
             Registered Customers
           </h1>
           <p className="text-sm text-[#6B6B88] mt-0.5">
-            {customers.length} registered customers in Supabase
+            {customers.length} registered customers in Neon
           </p>
         </div>
         <button

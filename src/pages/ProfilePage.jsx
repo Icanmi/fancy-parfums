@@ -19,7 +19,7 @@ import { useAdminData } from '../context/AdminDataContext'
 import { useWishlist } from '../context/WishlistContext'
 import { useCart } from '../context/CartContext'
 import { formatNaira, formatDate } from '../data/adminMockData'
-import { syncCustomerProfile, fetchCustomerOrders } from '../services/supabaseService'
+import { syncCustomerProfile, fetchCustomerOrders } from '../services/neonService'
 
 export default function ProfilePage() {
   const { user, isLoaded } = useUser()

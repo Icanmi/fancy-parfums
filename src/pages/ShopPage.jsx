@@ -104,7 +104,7 @@ export default function ShopPage() {
     setSearchParams({})
   }
 
-  // Filter & Sort Logic applied over live Supabase products
+  // Filter & Sort Logic applied over live Neon products
   const filteredProducts = useMemo(() => {
     return products
       .filter((product) => {

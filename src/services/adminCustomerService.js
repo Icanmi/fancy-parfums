@@ -39,7 +39,7 @@ export async function syncUserProfile({ clerkUserId, email, firstName, lastName,
     })
     return res.data?.profile
   } catch (err) {
-    console.error('Failed to sync user profile to Supabase:', err)
+    console.error('Failed to sync user profile to database:', err)
     return null
   }
 }

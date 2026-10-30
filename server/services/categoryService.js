@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../lib/supabaseAdmin.js'
+import { query } from '../lib/db.js'
 
 function slugify(text) {
   return String(text || '')
@@ -10,45 +10,61 @@ function slugify(text) {
 }
 
 export async function getAllCategories({ search, isActive, sortBy = 'name', sortDir = 'asc' } = {}) {
-  let query = supabaseAdmin
-    .from('categories')
-    .select('*, products(id)')
+  const conditions = []
+  const params = []
 
   if (isActive !== undefined && isActive !== 'all') {
-    query = query.eq('is_active', isActive === 'true' || isActive === true)
+    params.push(isActive === 'true' || isActive === true)
+    conditions.push(`c.is_active = $${params.length}`)
   }
 
   if (search) {
-    query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
+    params.push(`%${search}%`)
+    const idx = params.length
+    conditions.push(`(c.name ILIKE $${idx} OR c.description ILIKE $${idx})`)
   }
 
-  const ascending = sortDir === 'asc'
-  query = query.order(sortBy, { ascending })
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const validSortCols = ['id', 'name', 'created_at']
+  const safeSort = validSortCols.includes(sortBy) ? `c.${sortBy}` : 'c.name'
+  const safeDir = String(sortDir).toLowerCase() === 'desc' ? 'DESC' : 'ASC'
 
-  const { data, error } = await query
-  if (error) throw error
+  const sql = `
+    SELECT 
+      c.*,
+      COUNT(p.id)::int AS "productCount"
+    FROM public.categories c
+    LEFT JOIN public.products p ON p.category_id = c.id
+    ${whereClause}
+    GROUP BY c.id
+    ORDER BY ${safeSort} ${safeDir}
+  `
 
-  return (data || []).map((c) => ({
+  const rows = await query(sql, params)
+  return rows.map((c) => ({
     ...c,
     image: c.image_url || '/images/categories/designer.jpg',
-    productCount: c.products ? c.products.length : 0,
   }))
 }
 
 export async function getCategoryById(id) {
-  const { data, error } = await supabaseAdmin
-    .from('categories')
-    .select('*, products(id)')
-    .eq('id', id)
-    .single()
+  const sql = `
+    SELECT 
+      c.*,
+      COUNT(p.id)::int AS "productCount"
+    FROM public.categories c
+    LEFT JOIN public.products p ON p.category_id = c.id
+    WHERE c.id = $1
+    GROUP BY c.id
+    LIMIT 1
+  `
+  const rows = await query(sql, [id])
+  if (rows.length === 0) return null
 
-  if (error) throw error
-  if (!data) return null
-
+  const c = rows[0]
   return {
-    ...data,
-    image: data.image_url || '/images/categories/designer.jpg',
-    productCount: data.products ? data.products.length : 0,
+    ...c,
+    image: c.image_url || '/images/categories/designer.jpg',
   }
 }
 
@@ -73,45 +89,38 @@ export async function createCategory(catData) {
     throw new Error('Valid category slug is required.')
   }
 
-  // Check for duplicate slug
-  const { data: existing } = await supabaseAdmin
-    .from('categories')
-    .select('id')
-    .eq('slug', generatedSlug)
-    .maybeSingle()
-
-  if (existing) {
+  const existing = await query('SELECT id FROM public.categories WHERE slug = $1 LIMIT 1', [generatedSlug])
+  if (existing.length > 0) {
     throw new Error(`A category with slug "${generatedSlug}" already exists.`)
   }
 
   const active = is_active !== undefined ? Boolean(is_active) : (isActive !== undefined ? Boolean(isActive) : true)
 
-  const row = {
-    name: name.trim(),
-    slug: generatedSlug,
-    description: description ? description.trim() : null,
-    image_url: image_url || imageUrl || image || null,
-    is_active: active,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
+  const insertSql = `
+    INSERT INTO public.categories (name, slug, description, image_url, is_active, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, now(), now())
+    RETURNING *
+  `
 
-  const { data, error } = await supabaseAdmin
-    .from('categories')
-    .insert(row)
-    .select('*')
-    .single()
+  const rows = await query(insertSql, [
+    name.trim(),
+    generatedSlug,
+    description ? description.trim() : null,
+    image_url || imageUrl || image || null,
+    active
+  ])
 
-  if (error) throw error
+  const c = rows[0]
   return {
-    ...data,
-    image: data.image_url,
+    ...c,
+    image: c.image_url,
   }
 }
 
 export async function updateCategory(id, updates) {
   const allowedFields = ['name', 'slug', 'description', 'image_url', 'is_active']
-  const payload = {}
+  const setClauses = []
+  const params = []
 
   for (const key of Object.keys(updates)) {
     let dbKey = key
@@ -119,66 +128,48 @@ export async function updateCategory(id, updates) {
     if (key === 'isActive') dbKey = 'is_active'
 
     if (allowedFields.includes(dbKey)) {
-      payload[dbKey] = updates[key]
+      params.push(updates[key])
+      setClauses.push(`${dbKey} = $${params.length}`)
     }
   }
 
-  if (payload.name && payload.name.trim().length < 2) {
+  if (updates.name && updates.name.trim().length < 2) {
     throw new Error('Category name must be at least 2 characters.')
   }
 
-  if (payload.slug) {
-    payload.slug = slugify(payload.slug)
-    const { data: existing } = await supabaseAdmin
-      .from('categories')
-      .select('id')
-      .eq('slug', payload.slug)
-      .neq('id', id)
-      .maybeSingle()
-
-    if (existing) {
-      throw new Error(`A category with slug "${payload.slug}" already exists.`)
+  if (updates.slug) {
+    const slug = slugify(updates.slug)
+    const existing = await query('SELECT id FROM public.categories WHERE slug = $1 AND id != $2 LIMIT 1', [slug, id])
+    if (existing.length > 0) {
+      throw new Error(`A category with slug "${slug}" already exists.`)
     }
   }
 
-  payload.updated_at = new Date().toISOString()
+  setClauses.push('updated_at = now()')
+  params.push(id)
 
-  const { data, error } = await supabaseAdmin
-    .from('categories')
-    .update(payload)
-    .eq('id', id)
-    .select('*')
-    .single()
+  const updateSql = `
+    UPDATE public.categories
+    SET ${setClauses.join(', ')}
+    WHERE id = $${params.length}
+    RETURNING *
+  `
 
-  if (error) throw error
+  const rows = await query(updateSql, params)
+  const c = rows[0]
   return {
-    ...data,
-    image: data.image_url,
+    ...c,
+    image: c.image_url,
   }
 }
 
 export async function deleteCategory(id) {
-  // Check if any products use this category
-  const { data: linkedProducts, error: checkError } = await supabaseAdmin
-    .from('products')
-    .select('id, name')
-    .eq('category_id', id)
-    .limit(5)
-
-  if (checkError) throw checkError
-
-  if (linkedProducts && linkedProducts.length > 0) {
-    const names = linkedProducts.map((p) => p.name).join(', ')
-    throw new Error(`Cannot delete category. It is linked to ${linkedProducts.length} product(s): ${names}. Reassign or remove these products first.`)
+  const linked = await query('SELECT id, name FROM public.products WHERE category_id = $1 LIMIT 5', [id])
+  if (linked.length > 0) {
+    const names = linked.map((p) => p.name).join(', ')
+    throw new Error(`Cannot delete category. It is linked to ${linked.length} product(s): ${names}. Reassign or remove these products first.`)
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('categories')
-    .delete()
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
+  const rows = await query('DELETE FROM public.categories WHERE id = $1 RETURNING *', [id])
+  return rows[0]
 }

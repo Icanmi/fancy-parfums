@@ -136,10 +136,10 @@ export default function AdminProductFormPage() {
     try {
       if (isEdit) {
         await updateAdminProduct(id, payload)
-        toast.success('Product updated in Supabase!')
+        toast.success('Product updated successfully!')
       } else {
         await createAdminProduct(payload)
-        toast.success('Product created in Supabase!')
+        toast.success('Product created successfully!')
       }
       navigate('/admin/products')
     } catch (err) {
@@ -175,7 +175,7 @@ export default function AdminProductFormPage() {
             {isEdit ? 'Edit Product' : 'Add Product'}
           </h1>
           <p className="text-xs text-[#6B6B88] mt-0.5">
-            {isEdit ? `Editing product ID: ${id}` : 'Saved directly to Supabase via Express API'}
+            {isEdit ? `Editing product ID: ${id}` : 'Saved to Neon database via Express API'}
           </p>
         </div>
       </div>

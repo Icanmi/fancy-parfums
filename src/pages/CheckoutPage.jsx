@@ -399,7 +399,7 @@ export default function CheckoutPage() {
     }
 
     try {
-      // Save order to app state & Supabase
+      // Save order to app state & Neon
       if (typeof addOrder === 'function') {
         addOrder(newOrder)
       }

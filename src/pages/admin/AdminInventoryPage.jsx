@@ -12,7 +12,7 @@ function getStockStatus(qty) {
   return 'in_stock'
 }
 
-// Normalise Supabase row
+// Normalise Neon row
 function normalise(p) {
   return {
     ...p,
@@ -73,7 +73,7 @@ export default function AdminInventoryPage() {
         prev.map((p) => p.id === product.id ? { ...p, stockQuantity: newQty } : p)
       )
       setAdjustments((prev) => { const n = { ...prev }; delete n[product.id]; return n })
-      toast.success(`${product.name} stock updated to ${newQty} in Supabase.`)
+      toast.success(`${product.name} stock updated to ${newQty}.`)
     } catch (err) {
       console.error('Stock update failed:', err)
       toast.error('Failed to update stock. Try again.')
@@ -95,7 +95,7 @@ export default function AdminInventoryPage() {
       )
       setSelected([])
       setBulkQty('')
-      toast.success(`${selected.length} product(s) restocked to ${qty} in Supabase.`)
+      toast.success(`${selected.length} product(s) restocked to ${qty}.`)
     } catch (err) {
       console.error('Bulk restock failed:', err)
       toast.error('Bulk restock partially failed. Please retry.')
@@ -140,7 +140,7 @@ export default function AdminInventoryPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <div className="w-8 h-8 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-[#6B6B88]">Loading inventory from Supabase…</p>
+        <p className="text-sm text-[#6B6B88]">Loading inventory…</p>
       </div>
     )
   }
@@ -164,7 +164,7 @@ export default function AdminInventoryPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]" style={{ fontFamily: 'var(--font-display)' }}>Inventory</h1>
-          <p className="text-sm text-[#6B6B88] mt-0.5">{products.length} products tracked in Supabase</p>
+          <p className="text-sm text-[#6B6B88] mt-0.5">{products.length} products tracked in Neon</p>
         </div>
         <div className="flex items-center gap-2">
           <button

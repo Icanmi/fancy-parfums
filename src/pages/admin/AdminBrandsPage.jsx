@@ -42,7 +42,7 @@ export default function AdminBrandsPage() {
       await deleteAdminBrand(id)
       setBrands((prev) => prev.filter((b) => b.id !== id))
       if (typeof reloadBrands === 'function') reloadBrands()
-      toast.success('Brand deleted from Supabase.')
+      toast.success('Brand deleted.')
       setDeleteTarget(null)
     } catch (err) {
       console.error('Delete brand failed:', err)
@@ -58,7 +58,7 @@ export default function AdminBrandsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]" style={{ fontFamily: 'var(--font-display)' }}>Brands</h1>
-          <p className="text-sm text-[#6B6B88] mt-0.5">{brands.length} brand{brands.length === 1 ? '' : 's'} in Supabase</p>
+          <p className="text-sm text-[#6B6B88] mt-0.5">{brands.length} brand{brands.length === 1 ? '' : 's'} in Neon</p>
         </div>
         <div className="flex items-center gap-2">
           <button

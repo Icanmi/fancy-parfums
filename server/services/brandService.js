@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../lib/supabaseAdmin.js'
+import { query } from '../lib/db.js'
 
 function slugify(text) {
   return String(text || '')
@@ -10,44 +10,52 @@ function slugify(text) {
 }
 
 export async function getAllBrands({ search, isActive, sortBy = 'name', sortDir = 'asc' } = {}) {
-  let query = supabaseAdmin
-    .from('brands')
-    .select('*, products(id)')
+  const conditions = []
+  const params = []
 
   if (isActive !== undefined && isActive !== 'all') {
-    query = query.eq('is_active', isActive === 'true' || isActive === true)
+    params.push(isActive === 'true' || isActive === true)
+    conditions.push(`b.is_active = $${params.length}`)
   }
 
   if (search) {
-    query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%,origin.ilike.%${search}%`)
+    params.push(`%${search}%`)
+    const idx = params.length
+    conditions.push(`(b.name ILIKE $${idx} OR b.description ILIKE $${idx} OR b.origin ILIKE $${idx})`)
   }
 
-  const ascending = sortDir === 'asc'
-  query = query.order(sortBy, { ascending })
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const validSortCols = ['id', 'name', 'created_at']
+  const safeSort = validSortCols.includes(sortBy) ? `b.${sortBy}` : 'b.name'
+  const safeDir = String(sortDir).toLowerCase() === 'desc' ? 'DESC' : 'ASC'
 
-  const { data, error } = await query
-  if (error) throw error
+  const sql = `
+    SELECT 
+      b.*,
+      COUNT(p.id)::int AS "productCount"
+    FROM public.brands b
+    LEFT JOIN public.products p ON p.brand_id = b.id
+    ${whereClause}
+    GROUP BY b.id
+    ORDER BY ${safeSort} ${safeDir}
+  `
 
-  return (data || []).map((b) => ({
-    ...b,
-    productCount: b.products ? b.products.length : 0,
-  }))
+  return query(sql, params)
 }
 
 export async function getBrandById(id) {
-  const { data, error } = await supabaseAdmin
-    .from('brands')
-    .select('*, products(id)')
-    .eq('id', id)
-    .single()
-
-  if (error) throw error
-  if (!data) return null
-
-  return {
-    ...data,
-    productCount: data.products ? data.products.length : 0,
-  }
+  const sql = `
+    SELECT 
+      b.*,
+      COUNT(p.id)::int AS "productCount"
+    FROM public.brands b
+    LEFT JOIN public.products p ON p.brand_id = b.id
+    WHERE b.id = $1
+    GROUP BY b.id
+    LIMIT 1
+  `
+  const rows = await query(sql, [id])
+  return rows[0] || null
 }
 
 export async function createBrand(brandData) {
@@ -60,7 +68,6 @@ export async function createBrand(brandData) {
     logoUrl,
     is_active,
     isActive,
-    featured,
   } = brandData
 
   if (!name || name.trim().length < 2) {
@@ -72,43 +79,35 @@ export async function createBrand(brandData) {
     throw new Error('Valid brand slug is required.')
   }
 
-  // Check for duplicate slug
-  const { data: existing } = await supabaseAdmin
-    .from('brands')
-    .select('id')
-    .eq('slug', generatedSlug)
-    .maybeSingle()
-
-  if (existing) {
+  const existing = await query('SELECT id FROM public.brands WHERE slug = $1 LIMIT 1', [generatedSlug])
+  if (existing.length > 0) {
     throw new Error(`A brand with slug "${generatedSlug}" already exists.`)
   }
 
   const active = is_active !== undefined ? Boolean(is_active) : (isActive !== undefined ? Boolean(isActive) : true)
 
-  const row = {
-    name: name.trim(),
-    slug: generatedSlug,
-    description: description ? description.trim() : null,
-    origin: origin ? origin.trim() : null,
-    logo_url: logo_url || logoUrl || null,
-    is_active: active,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
+  const insertSql = `
+    INSERT INTO public.brands (name, slug, description, origin, logo_url, is_active, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, now(), now())
+    RETURNING *
+  `
 
-  const { data, error } = await supabaseAdmin
-    .from('brands')
-    .insert(row)
-    .select('*')
-    .single()
+  const rows = await query(insertSql, [
+    name.trim(),
+    generatedSlug,
+    description ? description.trim() : null,
+    origin ? origin.trim() : null,
+    logo_url || logoUrl || null,
+    active
+  ])
 
-  if (error) throw error
-  return data
+  return rows[0]
 }
 
 export async function updateBrand(id, updates) {
   const allowedFields = ['name', 'slug', 'description', 'origin', 'logo_url', 'is_active']
-  const payload = {}
+  const setClauses = []
+  const params = []
 
   for (const key of Object.keys(updates)) {
     let dbKey = key
@@ -116,64 +115,44 @@ export async function updateBrand(id, updates) {
     if (key === 'isActive') dbKey = 'is_active'
 
     if (allowedFields.includes(dbKey)) {
-      payload[dbKey] = updates[key]
+      params.push(updates[key])
+      setClauses.push(`${dbKey} = $${params.length}`)
     }
   }
 
-  if (payload.name && payload.name.trim().length < 2) {
+  if (updates.name && updates.name.trim().length < 2) {
     throw new Error('Brand name must be at least 2 characters.')
   }
 
-  if (payload.slug) {
-    payload.slug = slugify(payload.slug)
-    // Check if another brand has this slug
-    const { data: existing } = await supabaseAdmin
-      .from('brands')
-      .select('id')
-      .eq('slug', payload.slug)
-      .neq('id', id)
-      .maybeSingle()
-
-    if (existing) {
-      throw new Error(`A brand with slug "${payload.slug}" already exists.`)
+  if (updates.slug) {
+    const slug = slugify(updates.slug)
+    const existing = await query('SELECT id FROM public.brands WHERE slug = $1 AND id != $2 LIMIT 1', [slug, id])
+    if (existing.length > 0) {
+      throw new Error(`A brand with slug "${slug}" already exists.`)
     }
   }
 
-  payload.updated_at = new Date().toISOString()
+  setClauses.push('updated_at = now()')
+  params.push(id)
 
-  const { data, error } = await supabaseAdmin
-    .from('brands')
-    .update(payload)
-    .eq('id', id)
-    .select('*')
-    .single()
+  const updateSql = `
+    UPDATE public.brands
+    SET ${setClauses.join(', ')}
+    WHERE id = $${params.length}
+    RETURNING *
+  `
 
-  if (error) throw error
-  return data
+  const rows = await query(updateSql, params)
+  return rows[0]
 }
 
 export async function deleteBrand(id) {
-  // Check if any products use this brand
-  const { data: linkedProducts, error: checkError } = await supabaseAdmin
-    .from('products')
-    .select('id, name')
-    .eq('brand_id', id)
-    .limit(5)
-
-  if (checkError) throw checkError
-
-  if (linkedProducts && linkedProducts.length > 0) {
-    const names = linkedProducts.map((p) => p.name).join(', ')
-    throw new Error(`Cannot delete brand. It is linked to ${linkedProducts.length} product(s): ${names}. Reassign or remove these products first.`)
+  const linked = await query('SELECT id, name FROM public.products WHERE brand_id = $1 LIMIT 5', [id])
+  if (linked.length > 0) {
+    const names = linked.map((p) => p.name).join(', ')
+    throw new Error(`Cannot delete brand. It is linked to ${linked.length} product(s): ${names}. Reassign or remove these products first.`)
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('brands')
-    .delete()
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
+  const rows = await query('DELETE FROM public.brands WHERE id = $1 RETURNING *', [id])
+  return rows[0]
 }

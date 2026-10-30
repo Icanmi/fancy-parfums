@@ -1,5 +1,5 @@
 import express from 'express'
-import { supabaseAdmin } from '../lib/supabaseAdmin.js'
+import { query } from '../lib/db.js'
 
 const router = express.Router()
 
@@ -19,73 +19,79 @@ router.get('/products', async (req, res, next) => {
       sortDir = 'desc',
     } = req.query
 
-    let query = supabaseAdmin
-      .from('products')
-      .select('*, brands(id, name, slug, logo_url), categories(id, name, slug, image_url)')
-      .eq('is_active', true)
+    const conditions = ['p.is_active = true']
+    const params = []
 
     if (category) {
-      // Can be category ID or slug
       if (isNaN(category)) {
-        // Query by joined category slug if supported, or via category_id
-        const { data: catData } = await supabaseAdmin
-          .from('categories')
-          .select('id')
-          .eq('slug', category)
-          .single()
-        if (catData?.id) {
-          query = query.eq('category_id', catData.id)
-        }
+        params.push(category)
+        conditions.push(`c.slug = $${params.length}`)
       } else {
-        query = query.eq('category_id', Number(category))
+        params.push(Number(category))
+        conditions.push(`p.category_id = $${params.length}`)
       }
     } else if (categoryId) {
-      query = query.eq('category_id', Number(categoryId))
+      params.push(Number(categoryId))
+      conditions.push(`p.category_id = $${params.length}`)
     }
 
     if (brand) {
       if (isNaN(brand)) {
-        const { data: brandData } = await supabaseAdmin
-          .from('brands')
-          .select('id')
-          .eq('slug', brand)
-          .single()
-        if (brandData?.id) {
-          query = query.eq('brand_id', brandData.id)
-        }
+        params.push(brand)
+        conditions.push(`b.slug = $${params.length}`)
       } else {
-        query = query.eq('brand_id', Number(brand))
+        params.push(Number(brand))
+        conditions.push(`p.brand_id = $${params.length}`)
       }
     } else if (brandId) {
-      query = query.eq('brand_id', Number(brandId))
+      params.push(Number(brandId))
+      conditions.push(`p.brand_id = $${params.length}`)
     }
 
     if (gender) {
-      query = query.ilike('gender', gender)
+      params.push(gender)
+      conditions.push(`p.gender ILIKE $${params.length}`)
     }
 
     if (isFeatured === 'true' || isFeatured === true) {
-      query = query.eq('is_featured', true)
+      conditions.push(`p.is_featured = true`)
     }
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%,fragrance_family.ilike.%${search}%`)
+      params.push(`%${search}%`)
+      const idx = params.length
+      conditions.push(`(p.name ILIKE $${idx} OR p.description ILIKE $${idx} OR p.fragrance_family ILIKE $${idx})`)
     }
 
-    const ascending = sortDir === 'asc'
-    query = query.order(sortBy, { ascending })
+    const validSortCols = ['id', 'name', 'price', 'created_at', 'rating', 'review_count']
+    const safeSort = validSortCols.includes(sortBy) ? `p.${sortBy}` : 'p.created_at'
+    const safeDir = String(sortDir).toLowerCase() === 'asc' ? 'ASC' : 'DESC'
 
-    if (limit) {
-      query = query.limit(Number(limit))
+    let limitClause = ''
+    if (limit && !isNaN(limit)) {
+      params.push(Number(limit))
+      limitClause = `LIMIT $${params.length}`
     }
 
-    const { data, error } = await query
-    if (error) throw error
+    const sql = `
+      SELECT 
+        p.*,
+        CASE WHEN b.id IS NOT NULL THEN json_build_object('id', b.id, 'name', b.name, 'slug', b.slug, 'logo_url', b.logo_url) ELSE NULL END AS brands,
+        CASE WHEN c.id IS NOT NULL THEN json_build_object('id', c.id, 'name', c.name, 'slug', c.slug, 'image_url', c.image_url) ELSE NULL END AS categories
+      FROM public.products p
+      LEFT JOIN public.brands b ON p.brand_id = b.id
+      LEFT JOIN public.categories c ON p.category_id = c.id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY ${safeSort} ${safeDir}
+      ${limitClause}
+    `
+
+    const data = await query(sql, params)
 
     res.json({
       success: true,
-      count: data?.length || 0,
-      data: data || [],
+      count: data.length,
+      data,
     })
   } catch (err) {
     next(err)
@@ -97,27 +103,36 @@ router.get('/products/:idOrSlug', async (req, res, next) => {
   try {
     const { idOrSlug } = req.params
 
-    let query = supabaseAdmin
-      .from('products')
-      .select('*, brands(id, name, slug, logo_url, description), categories(id, name, slug, image_url, description)')
-      .eq('is_active', true)
+    let filterClause = ''
+    let paramVal = idOrSlug
 
     if (!isNaN(idOrSlug)) {
-      query = query.eq('id', Number(idOrSlug))
+      filterClause = 'p.id = $1'
+      paramVal = Number(idOrSlug)
     } else {
-      query = query.eq('slug', idOrSlug)
+      filterClause = 'p.slug = $1'
     }
 
-    const { data, error } = await query.maybeSingle()
-    if (error) throw error
+    const sql = `
+      SELECT 
+        p.*,
+        CASE WHEN b.id IS NOT NULL THEN json_build_object('id', b.id, 'name', b.name, 'slug', b.slug, 'logo_url', b.logo_url, 'description', b.description) ELSE NULL END AS brands,
+        CASE WHEN c.id IS NOT NULL THEN json_build_object('id', c.id, 'name', c.name, 'slug', c.slug, 'image_url', c.image_url, 'description', c.description) ELSE NULL END AS categories
+      FROM public.products p
+      LEFT JOIN public.brands b ON p.brand_id = b.id
+      LEFT JOIN public.categories c ON p.category_id = c.id
+      WHERE ${filterClause} AND p.is_active = true
+      LIMIT 1
+    `
 
-    if (!data) {
+    const rows = await query(sql, [paramVal])
+    if (rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Product not found' })
     }
 
     res.json({
       success: true,
-      data,
+      data: rows[0],
     })
   } catch (err) {
     next(err)
@@ -127,21 +142,25 @@ router.get('/products/:idOrSlug', async (req, res, next) => {
 // GET /api/categories — Active categories with product count
 router.get('/categories', async (req, res, next) => {
   try {
-    const { data: categories, error } = await supabaseAdmin
-      .from('categories')
-      .select('*, products(id)')
-      .eq('is_active', true)
-      .order('name', { ascending: true })
+    const sql = `
+      SELECT 
+        c.id, c.name, c.slug, c.description, c.image_url,
+        COUNT(p.id)::int AS "productCount"
+      FROM public.categories c
+      LEFT JOIN public.products p ON p.category_id = c.id AND p.is_active = true
+      WHERE c.is_active = true
+      GROUP BY c.id
+      ORDER BY c.name ASC
+    `
 
-    if (error) throw error
-
-    const mapped = (categories || []).map((c) => ({
+    const rows = await query(sql)
+    const mapped = rows.map((c) => ({
       id: c.id,
       name: c.name,
       slug: c.slug,
       description: c.description,
       image: c.image_url || '/images/categories/designer.jpg',
-      productCount: c.products ? c.products.length : 0,
+      productCount: c.productCount,
     }))
 
     res.json({
@@ -156,15 +175,19 @@ router.get('/categories', async (req, res, next) => {
 // GET /api/brands — Active brands with product count
 router.get('/brands', async (req, res, next) => {
   try {
-    const { data: brands, error } = await supabaseAdmin
-      .from('brands')
-      .select('*, products(id)')
-      .eq('is_active', true)
-      .order('name', { ascending: true })
+    const sql = `
+      SELECT 
+        b.id, b.name, b.slug, b.description, b.logo_url, b.origin,
+        COUNT(p.id)::int AS "productCount"
+      FROM public.brands b
+      LEFT JOIN public.products p ON p.brand_id = b.id AND p.is_active = true
+      WHERE b.is_active = true
+      GROUP BY b.id
+      ORDER BY b.name ASC
+    `
 
-    if (error) throw error
-
-    const mapped = (brands || []).map((b) => ({
+    const rows = await query(sql)
+    const mapped = rows.map((b) => ({
       id: b.id,
       name: b.name,
       slug: b.slug,
@@ -172,7 +195,7 @@ router.get('/brands', async (req, res, next) => {
       logoUrl: b.logo_url,
       logoText: b.name.toUpperCase(),
       origin: b.origin || 'Paris, France',
-      productCount: b.products ? b.products.length : 0,
+      productCount: b.productCount,
     }))
 
     res.json({

@@ -1,4 +1,4 @@
-// BestSellersSection.jsx — 4-up product card grid with live Supabase data
+// BestSellersSection.jsx — 4-up product card grid with live Neon data
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchStorefrontBestSellers } from '../../services/storefrontService'

@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../lib/supabaseAdmin.js'
+import { query } from '../lib/db.js'
 
 function slugify(text) {
   return String(text || '')
@@ -10,43 +10,64 @@ function slugify(text) {
 }
 
 export async function getAllProducts({ search, categoryId, brandId, isActive, sortBy = 'id', sortDir = 'asc' } = {}) {
-  let query = supabaseAdmin
-    .from('products')
-    .select('*, brands(id, name, slug), categories(id, name, slug)')
+  const conditions = []
+  const params = []
 
   if (isActive !== undefined && isActive !== 'all') {
-    query = query.eq('is_active', isActive === 'true' || isActive === true)
+    params.push(isActive === 'true' || isActive === true)
+    conditions.push(`p.is_active = $${params.length}`)
   }
 
   if (categoryId && categoryId !== 'all') {
-    query = query.eq('category_id', categoryId)
+    params.push(Number(categoryId))
+    conditions.push(`p.category_id = $${params.length}`)
   }
 
   if (brandId && brandId !== 'all') {
-    query = query.eq('brand_id', brandId)
+    params.push(Number(brandId))
+    conditions.push(`p.brand_id = $${params.length}`)
   }
 
   if (search) {
-    query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%,sku.ilike.%${search}%`)
+    params.push(`%${search}%`)
+    const idx = params.length
+    conditions.push(`(p.name ILIKE $${idx} OR p.description ILIKE $${idx} OR p.sku ILIKE $${idx})`)
   }
 
-  const ascending = sortDir === 'asc'
-  query = query.order(sortBy, { ascending })
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const validSortCols = ['id', 'name', 'price', 'created_at', 'stock_quantity', 'rating']
+  const safeSort = validSortCols.includes(sortBy) ? `p.${sortBy}` : 'p.id'
+  const safeDir = String(sortDir).toLowerCase() === 'desc' ? 'DESC' : 'ASC'
 
-  const { data, error } = await query
-  if (error) throw error
-  return data || []
+  const sql = `
+    SELECT 
+      p.*,
+      CASE WHEN b.id IS NOT NULL THEN json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) ELSE NULL END AS brands,
+      CASE WHEN c.id IS NOT NULL THEN json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) ELSE NULL END AS categories
+    FROM public.products p
+    LEFT JOIN public.brands b ON p.brand_id = b.id
+    LEFT JOIN public.categories c ON p.category_id = c.id
+    ${whereClause}
+    ORDER BY ${safeSort} ${safeDir}
+  `
+
+  return query(sql, params)
 }
 
 export async function getProductById(id) {
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .select('*, brands(id, name, slug), categories(id, name, slug)')
-    .eq('id', id)
-    .single()
-
-  if (error) throw error
-  return data
+  const sql = `
+    SELECT 
+      p.*,
+      CASE WHEN b.id IS NOT NULL THEN json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) ELSE NULL END AS brands,
+      CASE WHEN c.id IS NOT NULL THEN json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) ELSE NULL END AS categories
+    FROM public.products p
+    LEFT JOIN public.brands b ON p.brand_id = b.id
+    LEFT JOIN public.categories c ON p.category_id = c.id
+    WHERE p.id = $1
+    LIMIT 1
+  `
+  const rows = await query(sql, [id])
+  return rows[0] || null
 }
 
 export async function createProduct(productData) {
@@ -90,40 +111,42 @@ export async function createProduct(productData) {
 
   const generatedSlug = slugify(productData.slug || name)
   const finalSku = sku || `SKU-${Date.now()}`
+  const compPrice = compare_at_price !== undefined ? compare_at_price : compareAtPrice ? Number(compareAtPrice) : null
+  const bId = brand_id || brandId || null
+  const cId = category_id || categoryId || null
+  const ff = fragrance_family || fragranceFamily || null
+  const finalSizes = sizes.length ? sizes : [size]
+  const finalStock = stock_quantity !== undefined ? Number(stock_quantity) : stockQuantity !== undefined ? Number(stockQuantity) : 0
+  const finalImg = image_url || image || '/images/sauvage.jpg'
+  const finalImgs = images.length ? images : [finalImg]
+  const feat = is_featured !== undefined ? Boolean(is_featured) : Boolean(isFeatured)
+  const act = is_active !== undefined ? Boolean(is_active) : isActive !== undefined ? Boolean(isActive) : true
 
-  const row = {
-    name: name.trim(),
-    slug: generatedSlug,
-    description,
-    price: parsedPrice,
-    compare_at_price: compare_at_price !== undefined ? compare_at_price : compareAtPrice ? Number(compareAtPrice) : null,
-    brand_id: brand_id || brandId || null,
-    category_id: category_id || categoryId || null,
-    gender,
-    fragrance_family: fragrance_family || fragranceFamily || null,
-    concentration,
-    size,
-    sizes: sizes.length ? sizes : [size],
-    default_size: size,
-    stock_quantity: stock_quantity !== undefined ? Number(stock_quantity) : stockQuantity !== undefined ? Number(stockQuantity) : 0,
-    sku: finalSku,
-    image_url: image_url || image || '/images/sauvage.jpg',
-    images: images.length ? images : [image_url || image || '/images/sauvage.jpg'],
-    is_featured: is_featured !== undefined ? Boolean(is_featured) : Boolean(isFeatured),
-    is_active: is_active !== undefined ? Boolean(is_active) : isActive !== undefined ? Boolean(isActive) : true,
-    notes,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
+  const insertSql = `
+    INSERT INTO public.products (
+      name, slug, description, price, compare_at_price,
+      brand_id, category_id, gender, fragrance_family, concentration,
+      size, sizes, default_size, stock_quantity, sku,
+      image_url, images, is_featured, is_active, notes,
+      created_at, updated_at
+    ) VALUES (
+      $1, $2, $3, $4, $5,
+      $6, $7, $8, $9, $10,
+      $11, $12, $13, $14, $15,
+      $16, $17, $18, $19, $20,
+      now(), now()
+    )
+    RETURNING id
+  `
 
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .insert(row)
-    .select('*, brands(id, name, slug), categories(id, name, slug)')
-    .single()
+  const insertRes = await query(insertSql, [
+    name.trim(), generatedSlug, description, parsedPrice, compPrice,
+    bId, cId, gender, ff, concentration,
+    size, finalSizes, size, finalStock, finalSku,
+    finalImg, finalImgs, feat, act, JSON.stringify(notes)
+  ])
 
-  if (error) throw error
-  return data
+  return getProductById(insertRes[0].id)
 }
 
 export async function updateProduct(id, updates) {
@@ -134,9 +157,10 @@ export async function updateProduct(id, updates) {
     'sku', 'image_url', 'images', 'is_featured', 'is_active', 'notes'
   ]
 
-  const payload = {}
+  const setClauses = []
+  const params = []
+
   for (const key of Object.keys(updates)) {
-    // Map camelCase to snake_case if passed from frontend
     let dbKey = key
     if (key === 'compareAtPrice') dbKey = 'compare_at_price'
     if (key === 'brandId') dbKey = 'brand_id'
@@ -148,80 +172,65 @@ export async function updateProduct(id, updates) {
     if (key === 'isActive') dbKey = 'is_active'
 
     if (allowedFields.includes(dbKey)) {
-      payload[dbKey] = updates[key]
+      let val = updates[key]
+      if (dbKey === 'price') val = Number(val)
+      if (dbKey === 'compare_at_price' && val !== null) val = Number(val)
+      if (dbKey === 'stock_quantity') val = Number(val)
+      if (dbKey === 'notes') val = JSON.stringify(val)
+
+      params.push(val)
+      setClauses.push(`${dbKey} = $${params.length}`)
     }
   }
 
-  if (payload.price !== undefined) payload.price = Number(payload.price)
-  if (payload.compare_at_price !== undefined && payload.compare_at_price !== null) {
-    payload.compare_at_price = Number(payload.compare_at_price)
+  if (updates.name && !updates.slug) {
+    params.push(slugify(updates.name))
+    setClauses.push(`slug = $${params.length}`)
   }
-  if (payload.stock_quantity !== undefined) payload.stock_quantity = Number(payload.stock_quantity)
-  if (payload.name && !payload.slug) payload.slug = slugify(payload.name)
-  payload.updated_at = new Date().toISOString()
 
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .update(payload)
-    .eq('id', id)
-    .select('*, brands(id, name, slug), categories(id, name, slug)')
-    .single()
+  setClauses.push(`updated_at = now()`)
+  params.push(id)
 
-  if (error) throw error
-  return data
+  const updateSql = `
+    UPDATE public.products
+    SET ${setClauses.join(', ')}
+    WHERE id = $${params.length}
+    RETURNING id
+  `
+
+  await query(updateSql, params)
+  return getProductById(id)
 }
 
 export async function deleteProduct(id, { soft = false } = {}) {
   if (soft) {
-    const { data, error } = await supabaseAdmin
-      .from('products')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-    return data
+    const rows = await query(
+      'UPDATE public.products SET is_active = false, updated_at = now() WHERE id = $1 RETURNING *',
+      [id]
+    )
+    return rows[0]
   } else {
-    const { data, error } = await supabaseAdmin
-      .from('products')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-    return data
+    const rows = await query(
+      'DELETE FROM public.products WHERE id = $1 RETURNING *',
+      [id]
+    )
+    return rows[0]
   }
 }
 
 export async function updateStock(id, newQuantity) {
   const qty = Math.max(0, parseInt(newQuantity, 10))
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .update({ stock_quantity: qty, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select('id, name, stock_quantity')
-    .single()
-
-  if (error) throw error
-  return data
+  const rows = await query(
+    'UPDATE public.products SET stock_quantity = $1, updated_at = now() WHERE id = $2 RETURNING id, name, stock_quantity',
+    [qty, id]
+  )
+  return rows[0]
 }
 
 export async function getAllCategories() {
-  const { data, error } = await supabaseAdmin
-    .from('categories')
-    .select('*')
-    .order('name', { ascending: true })
-
-  if (error) throw error
-  return data || []
+  return query('SELECT * FROM public.categories ORDER BY name ASC')
 }
 
 export async function getAllBrands() {
-  const { data, error } = await supabaseAdmin
-    .from('brands')
-    .select('*')
-    .order('name', { ascending: true })
-
-  if (error) throw error
-  return data || []
+  return query('SELECT * FROM public.brands ORDER BY name ASC')
 }

@@ -16,7 +16,7 @@ function formatNaira(amount) {
   return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(amount || 0)
 }
 
-// Normalise raw Supabase row to a consistent shape for the UI
+// Normalise raw Neon row to a consistent shape for the UI
 function normaliseProduct(p) {
   return {
     ...p,
@@ -96,7 +96,7 @@ export default function AdminProductsPage() {
     try {
       await deleteAdminProduct(id)
       setProducts((prev) => prev.filter((p) => p.id !== id))
-      toast.success('Product deleted from Supabase.')
+      toast.success('Product deleted successfully.')
     } catch (err) {
       console.error('Delete failed:', err)
       toast.error('Failed to delete product.')
@@ -131,7 +131,7 @@ export default function AdminProductsPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <div className="w-8 h-8 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-[#6B6B88]">Loading products from Supabase…</p>
+        <p className="text-sm text-[#6B6B88]">Loading products from database…</p>
       </div>
     )
   }
@@ -333,7 +333,7 @@ export default function AdminProductsPage() {
               <div className="bg-white rounded-sm p-6 max-w-sm w-full shadow-2xl" style={{ border: '1px solid #ede9e0' }}>
                 <h3 className="font-bold text-base text-[#0A0A0A] mb-2">Delete Product?</h3>
                 <p className="text-sm text-[#6B6B88] mb-5">
-                  Are you sure you want to permanently delete <strong>{deleteTarget.name}</strong>? This cannot be undone and will remove it from Supabase.
+                  Are you sure you want to permanently delete <strong>{deleteTarget.name}</strong>? This cannot be undone and will remove it from the database.
                 </p>
                 <div className="flex gap-3 justify-end">
                   <button

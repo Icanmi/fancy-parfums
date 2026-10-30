@@ -1,47 +1,40 @@
 import express from 'express'
-import { supabaseAdmin } from '../lib/supabaseAdmin.js'
+import { query } from '../lib/db.js'
 import { requireAdmin } from '../middleware/authMiddleware.js'
 
 const router = express.Router()
 
-// GET /api/admin/customers — List registered customers from Supabase
+// GET /api/admin/customers — List registered customers from Neon
 router.get('/customers', requireAdmin, async (req, res, next) => {
   try {
     const { search } = req.query
-
-    let query = supabaseAdmin
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const conditions = []
+    const params = []
 
     if (search) {
-      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`)
+      params.push(`%${search}%`)
+      const idx = params.length
+      conditions.push(`(p.first_name ILIKE $${idx} OR p.last_name ILIKE $${idx} OR p.email ILIKE $${idx})`)
     }
 
-    const { data: profiles, error } = await query
-    if (error) throw error
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-    // Fetch order aggregates for each customer if orders exist
-    const { data: orders } = await supabaseAdmin
-      .from('orders')
-      .select('clerk_user_id, total, status')
+    const sql = `
+      SELECT 
+        p.*,
+        COALESCE(COUNT(o.id), 0)::int AS "ordersCount",
+        COALESCE(SUM(o.total), 0)::numeric AS "totalSpent"
+      FROM public.profiles p
+      LEFT JOIN public.orders o ON o.clerk_user_id = p.clerk_user_id
+      ${whereClause}
+      GROUP BY p.id
+      ORDER BY p.created_at DESC
+    `
 
-    const orderStatsByUser = {}
-    if (orders) {
-      for (const ord of orders) {
-        if (!ord.clerk_user_id) continue
-        if (!orderStatsByUser[ord.clerk_user_id]) {
-          orderStatsByUser[ord.clerk_user_id] = { count: 0, total: 0 }
-        }
-        orderStatsByUser[ord.clerk_user_id].count += 1
-        orderStatsByUser[ord.clerk_user_id].total += Number(ord.total || 0)
-      }
-    }
+    const profiles = await query(sql, params)
 
-    const customers = (profiles || []).map((p) => {
-      const stats = orderStatsByUser[p.clerk_user_id] || { count: 0, total: 0 }
-      const city = p.shipping_address?.city || (p.shipping_address?.state) || 'Lagos'
-
+    const customers = profiles.map((p) => {
+      const city = p.shipping_address?.city || p.shipping_address?.state || 'Lagos'
       return {
         id: p.id,
         clerkUserId: p.clerk_user_id,
@@ -51,8 +44,8 @@ router.get('/customers', requireAdmin, async (req, res, next) => {
         phone: p.phone || '—',
         city,
         shippingAddress: p.shipping_address || {},
-        ordersCount: stats.count,
-        totalSpent: stats.total,
+        ordersCount: Number(p.ordersCount || 0),
+        totalSpent: Number(p.totalSpent || 0),
         createdAt: p.created_at,
         updatedAt: p.updated_at,
       }

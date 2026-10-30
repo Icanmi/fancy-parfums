@@ -1,27 +1,48 @@
 import { Router } from 'express'
-import { getCustomerOrders } from '../services/orderService.js'
+import { getCustomerOrders, createCustomerOrder } from '../services/orderService.js'
 
 const router = Router()
 
 /**
  * GET /api/orders
- * Returns orders for the authenticated Clerk user.
- * Reads clerk_user_id from the x-clerk-user-id header (set by frontend) or
- * from a decoded Bearer token sub field.
+ * Returns orders for the authenticated Clerk user or by email query.
  */
 router.get('/orders', async (req, res, next) => {
   try {
-    // Accept clerk user id from a header (frontend sets this after Clerk auth)
     const clerkUserId =
       req.headers['x-clerk-user-id'] ||
-      extractUserIdFromToken(req.headers.authorization)
+      extractUserIdFromToken(req.headers.authorization) ||
+      req.query.clerkUserId
 
-    if (!clerkUserId) {
-      return res.status(401).json({ success: false, error: 'Authentication required.' })
+    const customerEmail = req.query.customerEmail
+
+    if (!clerkUserId && !customerEmail) {
+      return res.status(401).json({ success: false, error: 'Authentication or customerEmail required.' })
     }
 
-    const orders = await getCustomerOrders(clerkUserId)
+    const orders = await getCustomerOrders(clerkUserId, customerEmail)
     res.json({ success: true, data: orders, count: orders.length })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * POST /api/orders
+ * Creates a new order in Neon PostgreSQL.
+ */
+router.post('/orders', async (req, res, next) => {
+  try {
+    const { orderData, items } = req.body
+    if (!orderData) {
+      return res.status(400).json({ success: false, error: 'orderData is required.' })
+    }
+
+    const order = await createCustomerOrder(orderData, items || [])
+    res.status(201).json({
+      success: true,
+      data: order,
+    })
   } catch (err) {
     next(err)
   }

@@ -83,10 +83,10 @@ export default function AdminCategoryFormPage() {
     try {
       if (isEdit) {
         await updateAdminCategory(id, payload)
-        toast.success('Category updated in Supabase!')
+        toast.success('Category updated successfully!')
       } else {
         await createAdminCategory(payload)
-        toast.success('Category created in Supabase!')
+        toast.success('Category created successfully!')
       }
       if (typeof reloadCategories === 'function') {
         await reloadCategories()
@@ -122,7 +122,7 @@ export default function AdminCategoryFormPage() {
             {isEdit ? 'Edit Category' : 'Add Category'}
           </h1>
           <p className="text-xs text-[#6B6B88] mt-0.5">
-            {isEdit ? `Editing category ID: ${id}` : 'Persisted directly to Supabase via Express API'}
+            {isEdit ? `Editing category ID: ${id}` : 'Saved to Neon database via Express API'}
           </p>
         </div>
       </div>

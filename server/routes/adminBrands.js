@@ -38,13 +38,13 @@ router.get('/:id', async (req, res, next) => {
   }
 })
 
-// POST /api/admin/brands — Create brand in Supabase
+// POST /api/admin/brands — Create brand
 router.post('/', async (req, res, next) => {
   try {
     const brand = await createBrand(req.body)
     res.status(201).json({
       success: true,
-      message: 'Brand successfully created in Supabase',
+      message: 'Brand successfully created',
       data: brand,
     })
   } catch (err) {
@@ -52,14 +52,14 @@ router.post('/', async (req, res, next) => {
   }
 })
 
-// PATCH /api/admin/brands/:id — Update brand in Supabase
+// PATCH /api/admin/brands/:id — Update brand
 router.patch('/:id', async (req, res, next) => {
   try {
     const { id } = req.params
     const updated = await updateBrand(id, req.body)
     res.json({
       success: true,
-      message: 'Brand successfully updated in Supabase',
+      message: 'Brand successfully updated',
       data: updated,
     })
   } catch (err) {
@@ -67,14 +67,14 @@ router.patch('/:id', async (req, res, next) => {
   }
 })
 
-// DELETE /api/admin/brands/:id — Delete brand in Supabase
+// DELETE /api/admin/brands/:id — Delete brand
 router.delete('/:id', async (req, res, next) => {
   try {
     const { id } = req.params
     await deleteBrand(id)
     res.json({
       success: true,
-      message: 'Brand deleted successfully from Supabase',
+      message: 'Brand deleted successfully',
       data: { id },
     })
   } catch (err) {

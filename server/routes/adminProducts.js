@@ -52,7 +52,7 @@ router.post('/products', async (req, res, next) => {
     const product = await createProduct(req.body)
     res.status(201).json({
       success: true,
-      message: 'Product successfully created in Supabase',
+      message: 'Product successfully created',
       data: product,
     })
   } catch (err) {
@@ -67,7 +67,7 @@ router.patch('/products/:id', async (req, res, next) => {
     const updated = await updateProduct(id, req.body)
     res.json({
       success: true,
-      message: 'Product successfully updated in Supabase',
+      message: 'Product successfully updated',
       data: updated,
     })
   } catch (err) {
