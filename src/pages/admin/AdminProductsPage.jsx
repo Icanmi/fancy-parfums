@@ -51,7 +51,11 @@ export default function AdminProductsPage() {
       setProducts((data || []).map(normaliseProduct))
     } catch (err) {
       console.error('Failed to load products:', err)
-      setError('Failed to load products. Make sure the server is running.')
+      const statusCode = err?.response?.status
+      const serverMsg = err?.response?.data?.error
+      const netMsg = err?.code === 'ERR_NETWORK' ? 'Network error — is the server running on port 5000?' : null
+      const detail = serverMsg || netMsg || err?.message || 'Unknown error'
+      setError(`Failed to load products: ${detail}${statusCode ? ` (HTTP ${statusCode})` : ''}`)
       toast.error('Failed to load products from server.')
     } finally {
       setLoading(false)

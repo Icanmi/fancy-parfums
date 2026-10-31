@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+import { verifyAdminToken } from '../lib/adminAuthUtils.js'
 
 dotenv.config({ path: '.env.local' })
 dotenv.config()
@@ -10,14 +11,14 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'admin@fancyatelier.com,owner@
   .map((e) => e.trim())
 
 /**
- * Verifies Clerk authentication and administrator privileges.
+ * Verifies Neon Admin authentication or legacy Clerk administrator privileges.
  */
 export async function requireAdmin(req, res, next) {
   try {
     const authHeader = req.headers.authorization
     const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null
 
-    // Also check for optional server-to-server admin secret
+    // 1. Check for optional server-to-server admin secret
     const adminSecret = req.headers['x-admin-secret']
     if (adminSecret && adminSecret === process.env.ADMIN_SECRET_KEY) {
       req.user = { role: 'admin', authType: 'secret' }
@@ -25,7 +26,7 @@ export async function requireAdmin(req, res, next) {
     }
 
     if (!token) {
-      // In local dev/demo environment without active Clerk session,
+      // In local dev/demo environment without active session,
       // allow if explicit dev header is provided, otherwise return 401.
       if (process.env.NODE_ENV === 'development' && req.headers['x-dev-admin'] === 'true') {
         req.user = { role: 'admin', email: 'dev-admin@fancyatelier.com' }
@@ -37,7 +38,20 @@ export async function requireAdmin(req, res, next) {
       })
     }
 
-    // Decode token payload (Clerk JWT format)
+    // 2. First verify as dedicated Neon Admin Token
+    const adminPayload = verifyAdminToken(token)
+    if (adminPayload && adminPayload.sub && adminPayload.role === 'admin') {
+      req.user = {
+        id: adminPayload.sub,
+        email: adminPayload.email,
+        name: adminPayload.name,
+        role: adminPayload.role,
+        authType: 'neon',
+      }
+      return next()
+    }
+
+    // 3. Fallback: Decode token payload (Clerk JWT format)
     const payload = parseJwt(token)
     if (!payload || !payload.sub) {
       return res.status(401).json({
@@ -61,8 +75,7 @@ export async function requireAdmin(req, res, next) {
     const isAdmin =
       userRole === 'admin' ||
       ADMIN_EMAILS.includes(userEmail) ||
-      payload.sub.startsWith('admin_') ||
-      process.env.NODE_ENV === 'development' // permissive in dev for testing
+      payload.sub.startsWith('admin_')
 
     if (!isAdmin) {
       return res.status(403).json({
@@ -75,6 +88,7 @@ export async function requireAdmin(req, res, next) {
       id: payload.sub,
       email: userEmail,
       role: 'admin',
+      authType: 'clerk',
       ...payload,
     }
 
@@ -88,7 +102,7 @@ export async function requireAdmin(req, res, next) {
   }
 }
 
-function parseJwt(token) {
+export function parseJwt(token) {
   try {
     const base64Url = token.split('.')[1]
     if (!base64Url) return null

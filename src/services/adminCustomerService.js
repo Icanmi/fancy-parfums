@@ -7,8 +7,10 @@ function getAuthHeaders(token) {
     'Content-Type': 'application/json',
     'x-dev-admin': 'true',
   }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+  const resolvedToken =
+    token || (typeof window !== 'undefined' ? localStorage.getItem('atelier_admin_token') : null)
+  if (resolvedToken) {
+    headers['Authorization'] = `Bearer ${resolvedToken}`
   }
   return headers
 }

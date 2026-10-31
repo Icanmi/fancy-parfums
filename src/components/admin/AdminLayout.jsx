@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAdminAuth } from '../../context/AdminAuthContext'
 import {
   RiDashboardLine,
   RiShoppingBag3Line,
@@ -13,6 +14,7 @@ import {
   RiMenuLine,
   RiCloseLine,
   RiAdminLine,
+  RiLogoutBoxRLine,
 } from 'react-icons/ri'
 
 const NAV_ITEMS = [
@@ -27,19 +29,46 @@ const NAV_ITEMS = [
 
 function SidebarContent({ onLinkClick }) {
   const navigate = useNavigate()
+  const { logout, admin } = useAdminAuth()
+
+  async function handleLogout() {
+    await logout()
+    navigate('/admin/login', { replace: true })
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-white/10">
-        <div className="w-8 h-8 rounded-sm flex items-center justify-center flex-shrink-0"
-          style={{ background: '#D4AF37' }}>
-          <span style={{ fontFamily: 'var(--font-display)', color: '#0A0A0A', fontWeight: 700, fontSize: 13 }}>FA</span>
+        <div
+          className="w-8 h-8 rounded-sm flex items-center justify-center flex-shrink-0"
+          style={{ background: '#D4AF37' }}
+        >
+          <span style={{ fontFamily: 'var(--font-display)', color: '#0A0A0A', fontWeight: 700, fontSize: 13 }}>
+            FA
+          </span>
         </div>
         <div>
-          <p style={{ color: '#D4AF37', fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+          <p
+            style={{
+              color: '#D4AF37',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+            }}
+          >
             Fancy Atelier
           </p>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+          <p
+            style={{
+              color: 'rgba(255,255,255,0.4)',
+              fontSize: 9,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+            }}
+          >
             Admin Portal
           </p>
         </div>
@@ -73,14 +102,22 @@ function SidebarContent({ onLinkClick }) {
         ))}
       </nav>
 
-      {/* Back to store */}
-      <div className="px-3 pb-6 border-t border-white/10 pt-4">
+      {/* Footer controls: Back to store & Sign Out */}
+      <div className="px-3 pb-6 border-t border-white/10 pt-4 flex flex-col gap-1">
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-medium text-white/40 hover:text-white/70 transition-colors w-full"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-medium text-white/40 hover:text-white/70 transition-colors w-full text-left"
         >
           <RiArrowGoBackLine size={17} />
           <span>Back to Store</span>
+        </button>
+
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-medium text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition-colors w-full text-left"
+        >
+          <RiLogoutBoxRLine size={17} />
+          <span>Sign Out</span>
         </button>
       </div>
     </div>
@@ -89,6 +126,14 @@ function SidebarContent({ onLinkClick }) {
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { admin, logout } = useAdminAuth()
+  const navigate = useNavigate()
+  const displayName = admin?.name || 'Administrator'
+
+  async function handleLogout() {
+    await logout()
+    navigate('/admin/login', { replace: true })
+  }
 
   return (
     <div className="flex min-h-screen" style={{ background: '#F5F3EE' }}>
@@ -147,15 +192,29 @@ export default function AdminLayout() {
             <RiMenuLine size={20} />
           </button>
           <div className="flex-1" />
-          {/* Admin avatar */}
-          <div className="flex items-center gap-2.5">
-            <span className="hidden sm:block text-xs font-semibold text-[#6B6B88]">Admin</span>
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ background: '#0A0A0A' }}
-            >
-              <RiAdminLine size={16} color="#D4AF37" />
+
+          {/* Admin avatar & Logout */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="hidden sm:block text-xs font-semibold text-[#6B6B88]">
+                {displayName}
+              </span>
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: '#0A0A0A' }}
+              >
+                <RiAdminLine size={16} color="#D4AF37" />
+              </div>
             </div>
+
+            <button
+              onClick={handleLogout}
+              title="Sign Out"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <RiLogoutBoxRLine size={15} />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </div>
         </header>
 

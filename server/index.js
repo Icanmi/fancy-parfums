@@ -7,6 +7,7 @@ import adminBrandsRouter from './routes/adminBrands.js'
 import adminCategoriesRouter from './routes/adminCategories.js'
 import adminCustomersRouter from './routes/adminCustomers.js'
 import adminOrdersRouter from './routes/adminOrders.js'
+import adminAuthRouter from './routes/adminAuth.js'
 import orderRoutes from './routes/orderRoutes.js'
 import couponRoutes from './routes/couponRoutes.js'
 import userRoutes from './routes/userRoutes.js'
@@ -39,6 +40,7 @@ app.get('/api/health', (req, res) => {
 
 // Routes
 app.use('/api', publicCatalogRouter)
+app.use('/api/admin/auth', adminAuthRouter)
 app.use('/api/users', userRoutes)
 app.use('/api/admin/brands', adminBrandsRouter)
 app.use('/api/admin/categories', adminCategoriesRouter)

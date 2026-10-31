@@ -1,7 +1,73 @@
 import express from 'express'
 import { query } from '../lib/db.js'
+import { parseJwt } from '../middleware/authMiddleware.js'
+
+// Admin emails — must match the list in authMiddleware.js
+const ADMIN_EMAILS = (
+  process.env.ADMIN_EMAILS || 'admin@fancyatelier.com,owner@fancyatelier.com,lenovo@gmail.com'
+)
+  .toLowerCase()
+  .split(',')
+  .map((e) => e.trim())
 
 const router = express.Router()
+
+// GET /api/users/me/role — returns the effective role for the signed-in Clerk user.
+// Resolution order:
+//   1. profiles.role = 'admin' in Neon  (set by DB migration / manual promotion)
+//   2. Email from JWT matches ADMIN_EMAILS list  (works before profile row is created)
+//   3. Default → 'customer'
+// Authorization: Bearer <clerk-session-token>
+router.get('/me/role', async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null
+
+    if (!token) {
+      return res.status(401).json({ success: false, error: 'Not authenticated' })
+    }
+
+    const payload = parseJwt(token)
+    if (!payload?.sub) {
+      return res.status(401).json({ success: false, error: 'Invalid token' })
+    }
+
+    // 1. Check Neon profile first
+    const rows = await query(
+      'SELECT role, email FROM public.profiles WHERE clerk_user_id = $1 LIMIT 1',
+      [payload.sub]
+    )
+
+    if (rows.length > 0 && rows[0].role === 'admin') {
+      return res.json({ success: true, role: 'admin' })
+    }
+
+    // 2. Fallback: check email from JWT against admin list
+    //    (covers newly registered Clerk accounts before UserSync has run)
+    const jwtEmail = (
+      payload.email ||
+      payload.primary_email_address ||
+      payload.email_addresses?.[0]?.email_address ||
+      ''
+    ).toLowerCase().trim()
+
+    if (jwtEmail && ADMIN_EMAILS.includes(jwtEmail)) {
+      // Promote the profile in the DB if it already exists
+      if (rows.length > 0) {
+        await query(
+          'UPDATE public.profiles SET role = $1 WHERE clerk_user_id = $2',
+          ['admin', payload.sub]
+        )
+      }
+      return res.json({ success: true, role: 'admin' })
+    }
+
+    // 3. Default to customer
+    return res.json({ success: true, role: rows.length > 0 ? rows[0].role : 'customer' })
+  } catch (err) {
+    next(err)
+  }
+})
 
 // POST /api/users/sync — Sync / upsert Clerk user into Neon profiles table
 router.post('/sync', async (req, res, next) => {

@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast'
 import { CartProvider } from './context/CartContext'
 import { WishlistProvider } from './context/WishlistContext'
 import { AdminDataProvider } from './context/AdminDataContext'
+import { AdminAuthProvider } from './context/AdminAuthContext'
 
 // Storefront pages
 import HomePage from './pages/HomePage'
@@ -26,6 +27,7 @@ import OrderConfirmationPage from './pages/OrderConfirmationPage'
 
 // Admin layout + pages
 import AdminLayout from './components/admin/AdminLayout'
+import AdminLoginPage from './pages/admin/AdminLoginPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminProductsPage from './pages/admin/AdminProductsPage'
 import AdminProductFormPage from './pages/admin/AdminProductFormPage'
@@ -39,6 +41,7 @@ import AdminCustomersPage from './pages/admin/AdminCustomersPage'
 import AdminInventoryPage from './pages/admin/AdminInventoryPage'
 
 import UserSync from './components/auth/UserSync'
+import ProtectedAdminRoute from './components/auth/ProtectedAdminRoute'
 
 const CLERK_PUBLISHABLE_KEY =
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
@@ -84,69 +87,76 @@ export default function App() {
       }}
     >
       <UserSync />
-      <AdminDataProvider>
-        <CartProvider>
-          <WishlistProvider>
-            <BrowserRouter>
-              <ScrollToTop />
-              <Toaster
-                position="top-right"
-                toastOptions={{
-                  duration: 3000,
-                  style: {
-                    background: '#0A0A0A',
-                    color: '#FBF8EF',
-                    border: '1px solid rgba(212,175,55,0.3)',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                  },
-                }}
-              />
-              <Routes>
-                {/* ── Storefront ── */}
-                <Route path="/" element={<HomePage />} />
-                <Route path="/shop" element={<ShopPage />} />
-                <Route path="/product/:id" element={<ProductDetailPage />} />
-                <Route path="/categories" element={<CategoriesPage />} />
-                <Route path="/brands" element={<BrandsPage />} />
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/wishlist" element={<WishlistPage />} />
+      <AdminAuthProvider>
+        <AdminDataProvider>
+          <CartProvider>
+            <WishlistProvider>
+              <BrowserRouter>
+                <ScrollToTop />
+                <Toaster
+                  position="top-right"
+                  toastOptions={{
+                    duration: 3000,
+                    style: {
+                      background: '#0A0A0A',
+                      color: '#FBF8EF',
+                      border: '1px solid rgba(212,175,55,0.3)',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                    },
+                  }}
+                />
+                <Routes>
+                  {/* ── Storefront ── */}
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/shop" element={<ShopPage />} />
+                  <Route path="/product/:id" element={<ProductDetailPage />} />
+                  <Route path="/categories" element={<CategoriesPage />} />
+                  <Route path="/brands" element={<BrandsPage />} />
+                  <Route path="/cart" element={<CartPage />} />
+                  <Route path="/wishlist" element={<WishlistPage />} />
 
-                {/* ── Auth ── */}
-                <Route path="/sign-in/*" element={<SignInPage />} />
-                <Route path="/sign-up/*" element={<SignUpPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
+                  {/* ── Auth ── */}
+                  <Route path="/sign-in/*" element={<SignInPage />} />
+                  <Route path="/sign-up/*" element={<SignUpPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
 
-                {/* ── Checkout ── */}
-                <Route path="/checkout" element={<CheckoutPage />} />
-                <Route path="/order-confirmation/:id" element={<OrderConfirmationPage />} />
+                  {/* ── Checkout ── */}
+                  <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="/order-confirmation/:id" element={<OrderConfirmationPage />} />
 
-                {/* ── Admin ── */}
-                <Route path="/admin" element={<AdminLayout />}>
-                  <Route index element={<Navigate to="/admin/dashboard" replace />} />
-                  <Route path="dashboard" element={<AdminDashboardPage />} />
-                  <Route path="products" element={<AdminProductsPage />} />
-                  <Route path="products/new" element={<AdminProductFormPage />} />
-                  <Route path="products/:id/edit" element={<AdminProductFormPage />} />
-                  <Route path="categories" element={<AdminCategoriesPage />} />
-                  <Route path="categories/new" element={<AdminCategoryFormPage />} />
-                  <Route path="categories/:id/edit" element={<AdminCategoryFormPage />} />
-                  <Route path="brands" element={<AdminBrandsPage />} />
-                  <Route path="brands/new" element={<AdminBrandFormPage />} />
-                  <Route path="brands/:id/edit" element={<AdminBrandFormPage />} />
-                  <Route path="orders" element={<AdminOrdersPage />} />
-                  <Route path="orders/:id" element={<AdminOrderDetailPage />} />
-                  <Route path="customers" element={<AdminCustomersPage />} />
-                  <Route path="inventory" element={<AdminInventoryPage />} />
-                </Route>
+                  {/* ── Admin Login (Public Neon Auth) ── */}
+                  <Route path="/admin/login" element={<AdminLoginPage />} />
 
-                {/* Fallback */}
-                <Route path="*" element={<ShopPage />} />
-              </Routes>
-            </BrowserRouter>
-          </WishlistProvider>
-        </CartProvider>
-      </AdminDataProvider>
+                  {/* ── Admin (Protected Neon Auth) ── */}
+                  <Route element={<ProtectedAdminRoute />}>
+                    <Route path="/admin" element={<AdminLayout />}>
+                      <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                      <Route path="dashboard" element={<AdminDashboardPage />} />
+                      <Route path="products" element={<AdminProductsPage />} />
+                      <Route path="products/new" element={<AdminProductFormPage />} />
+                      <Route path="products/:id/edit" element={<AdminProductFormPage />} />
+                      <Route path="categories" element={<AdminCategoriesPage />} />
+                      <Route path="categories/new" element={<AdminCategoryFormPage />} />
+                      <Route path="categories/:id/edit" element={<AdminCategoryFormPage />} />
+                      <Route path="brands" element={<AdminBrandsPage />} />
+                      <Route path="brands/new" element={<AdminBrandFormPage />} />
+                      <Route path="brands/:id/edit" element={<AdminBrandFormPage />} />
+                      <Route path="orders" element={<AdminOrdersPage />} />
+                      <Route path="orders/:id" element={<AdminOrderDetailPage />} />
+                      <Route path="customers" element={<AdminCustomersPage />} />
+                      <Route path="inventory" element={<AdminInventoryPage />} />
+                    </Route>
+                  </Route>
+
+                  {/* Fallback */}
+                  <Route path="*" element={<ShopPage />} />
+                </Routes>
+              </BrowserRouter>
+            </WishlistProvider>
+          </CartProvider>
+        </AdminDataProvider>
+      </AdminAuthProvider>
     </ClerkProvider>
   )
 }
