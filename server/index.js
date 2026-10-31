@@ -53,8 +53,10 @@ app.use('/api', couponRoutes)
 // Error handling
 app.use(errorHandler)
 
-app.listen(PORT, () => {
-  console.log(`[API Server] Fancy Atelier Parfums Express API running on http://localhost:${PORT}`)
-})
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`[API Server] Fancy Atelier Parfums Express API running on http://localhost:${PORT}`)
+  })
+}
 
 export default app
